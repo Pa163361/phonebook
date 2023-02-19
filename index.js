@@ -8,6 +8,9 @@ app.use(morgan("tiny"))
 app.use(cors())
 app.use(express.static('build'))
 
+
+const Contact = require('./models/contact')
+
 let contacts = [
     {
         id: 1,
@@ -36,16 +39,18 @@ app.get('/', (request, response) => {
 })
 
 app.get('/api/contacts', (request, response) => {
-    response.json(contacts).end()
+    Contact.find({}).then(result => {
+        console.log('get, backend, result => ', result)
+        response.json(result)
+    })
 })
 
 app.get('/api/contacts/:id', (request, response) => {
-    let id = Number(request.params.id)
-    const contact = contacts.find(c => c.id === id)
-    if (!contact) {
-        response.status(404).end()
-    }
-    response.status(200).json(contact).end()
+    Contact.find({ _id: request.params.id }).then(result => {
+        response.json(result)
+    }).catch(error => {
+        response.status(204).end()
+    })
 })
 
 app.get('/info', (request, response) => {
@@ -64,32 +69,41 @@ app.post('/api/contacts', (request, response) => {
         return response.status(400).json({ error: 'Invalid number!' }).end()
     }
 
-    if (contacts.find(contact => contact.name.toUpperCase() === body.name.toUpperCase())) {
-        return response.status(400).json({ error: 'Name already exists!!!' }).end()
-    }
-
     let contact = {
-        id: contacts.length > 0 ? 1 + Math.max(...contacts.map(c => c.id)) : 0,
         name: body.name,
         num: body.num
     }
 
-    contacts = contacts.concat(contact)
-    console.log('post req result, backend, contacts =>', contacts)
-    response.json(contact).end()
+    Contact.create(contact).then(result => {
+        console.log('post, backend, result => ', result)
+        response.json(result)
+    }).catch(error => {
+        response.json(409)
+    })
+
 })
 
 app.put('/api/contacts/:id', (request, response) => {
     console.log('put req, backend, request.body =>', request.body)
     const body = request.body
-    contacts = contacts.map(contact => contact.id !== body.id ? contact : body)
-    response.status(201).end()
+
+    Contact.updateOne({ _id: request.params.id }, { name: body.name, num: body.num }).then(result => {
+        console.log('put, backend, result => ', result)
+        response.status(200).json(result)
+    }).catch(error => {
+        response.status(409).json(error)
+    })
+
 })
 
 app.delete('/api/contacts/:id', (request, response) => {
-    let id = Number(request.params.id);
-    contacts = contacts.filter(contact => contact.id !== id)
-    response.status(204).end()
+
+    Contact.deleteOne({ _id: request.params.id }).then(result => {
+        response.status(204).json({ message: "Deleted successfully", result })
+    }).catch(error => {
+        response.status(409).json({ message: "Not deleted", error })
+    })
+
 })
 
 const PORT = process.env.PORT || 3002
